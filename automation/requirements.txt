@@ -1,0 +1,7 @@
+flask
+pandas
+openpyxl
+docxtpl
+docx2pdf
+num2words
+gunicorn
