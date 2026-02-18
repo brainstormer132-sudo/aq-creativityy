@@ -1,25 +1,27 @@
 {
-  "output_dir": "C:\\Users\\siraj\\OneDrive - AQ Creativity\\CONTRACTS",
+"output_dir": "CONTRACTS",
 
-  "temp_convert_dir": "C:\\Users\\siraj\\OneDrive - AQ Creativity\\TEMP",
+"temp_convert_dir": "TEMP",
 
-  "generated_excel_path": "C:\\Users\\siraj\\OneDrive - AQ Creativity\\generated.xlsx",
+"generated_excel_path": "generated.xlsx",
 
-  "archive_dir": "C:\\Users\\siraj\\OneDrive - AQ Creativity\\ARCHIVE",
+"archive_dir": "ARCHIVE",
 
-  "brand_id_file": "C:\\Users\\siraj\\OneDrive - AQ Creativity\\brand_ids.json",
+"brand_id_file": "brand_ids.json",
 
-  "standard_template_key": "after_pay",
+"standard_template_key": "after_pay",
 
-  "template_map": {
+"template_map": {
 
-    "after_pay": "C:\\Users\\siraj\\PycharmProjects\\automation\\templates\\Contract template(2).docx",
+```
+"after_pay": "templates/Contract template(2).docx",
 
-    "pre_pay": "C:\\Users\\siraj\\PycharmProjects\\automation\\templates\\advance payment contract .docx",
+"pre_pay": "templates/advance payment contract .docx",
 
-    "free_lancer": "C:\\Users\\siraj\\PycharmProjects\\automation\\templates\\Freelancer Contract .docx",
+"free_lancer": "templates/Freelancer Contract .docx",
 
-    "savola": "C:\\Users\\siraj\\PycharmProjects\\automation\\templates\\Savola Contract  FULL.docx"
+"savola": "templates/Savola Contract  FULL.docx"
+```
 
-  }
+}
 }
