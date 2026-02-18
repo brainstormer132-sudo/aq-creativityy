@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>AQ Creativity Contracts</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<h1>AQ Creativity Contract Dashboard</h1>
+
+<table>
+
+<tr>
+
+<th>ID</th>
+<th>Brand</th>
+<th>Amount</th>
+<th>Status</th>
+<th>Action</th>
+
+</tr>
+
+{% for task in tasks %}
+
+<tr>
+
+<td>{{ task.id }}</td>
+
+<td>{{ task.brand }}</td>
+
+<td>{{ task.amount }}</td>
+
+<td>{{ task.status }}</td>
+
+<td>
+
+<a href="/generate/{{ task.id }}">
+
+<button>Generate Contract</button>
+
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</body>
+
+</html>
