@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect
 import sqlite3
+import gc
 
 # IMPORTANT
 from contract_generator import generate_contract_from_gui
@@ -96,6 +97,9 @@ def generate(task_id):
 
 
         generate_contract_from_gui(context)
+        # Force a GC pass between subtasks so peak memory does not drift
+        # upward across a 10+ subtask batch on Render's 512 MB worker.
+        gc.collect()
 
 
     return redirect("/")

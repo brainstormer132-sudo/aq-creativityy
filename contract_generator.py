@@ -2,6 +2,10 @@ import json
 import os
 import re
 import shutil
+import gc
+import subprocess
+import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -63,6 +67,52 @@ ARABIC_DAYS = {
 
 last_number = 0
 _runtime = None
+
+
+# Memory hygiene for Render's 512 MB free-tier worker. docx2pdf on Linux
+# shells out to soffice with no flag control; we replace it with a direct
+# subprocess call that uses --norestore --nologo --nofirststartwizard
+# --nolockcheck + a fresh per-call UserInstallation profile so LibreOffice
+# can't grow state across contracts.
+SOFFICE_TIMEOUT_S = 60
+
+
+def _convert_docx_to_pdf(docx_path: str, out_dir: str) -> None:
+    """Convert one DOCX to PDF using LibreOffice headless.
+
+    Replaces docx2pdf.convert(temp_dir) inside generate_contract_from_gui.
+    On Render's 512 MB worker, a fresh soffice invocation per contract +
+    a fresh UserInstallation profile keeps peak memory bounded.
+    """
+    profile_dir = Path(out_dir) / f"lo-profile-{uuid.uuid4().hex}"
+    try:
+        profile_uri = profile_dir.resolve().as_uri()
+        result = subprocess.run(
+            [
+                "soffice",
+                "--headless",
+                "--norestore",
+                "--nologo",
+                "--nofirststartwizard",
+                "--nolockcheck",
+                f"-env:UserInstallation={profile_uri}",
+                "--convert-to", "pdf",
+                "--outdir", str(out_dir),
+                str(docx_path),
+            ],
+            capture_output=True,
+            timeout=SOFFICE_TIMEOUT_S,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or b"").decode("utf-8", errors="replace")[:400]
+            print(f"[soffice] non-zero exit {result.returncode}: {err}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print(f"[soffice] timeout converting {docx_path}", file=sys.stderr)
+    except FileNotFoundError:
+        print("[soffice] binary not found - install libreoffice", file=sys.stderr)
+    finally:
+        # Drop the temp LO profile immediately so it can't grow across calls.
+        shutil.rmtree(profile_dir, ignore_errors=True)
 
 
 def _require(dep_name: str, install_hint: str):
@@ -276,10 +326,8 @@ def generate_contract_from_gui(context):
 
     pd = _require("pandas", "pip install pandas openpyxl")
     docxtpl_module = _require("docxtpl", "pip install docxtpl")
-    docx2pdf_module = _require("docx2pdf", "pip install docx2pdf")
 
     DocxTemplate = getattr(docxtpl_module, "DocxTemplate")
-    convert = getattr(docx2pdf_module, "convert")
 
     if last_number == 0:
         last_number = _load_last_number_from_generated_sheet()
@@ -326,8 +374,18 @@ def generate_contract_from_gui(context):
     doc.render(ctx)
     doc.save(docx_path)
 
-    shutil.copy(docx_path, str(runtime["temp_convert_dir"] / Path(docx_path).name))
-    convert(str(runtime["temp_convert_dir"]))
+    # Free the large lxml tree before spawning soffice so the conversion
+    # process gets the headroom it needs on Render's 512 MB worker.
+    del doc
+    gc.collect()
+
+    # Per-contract soffice with bounded memory. Replaces
+    # docx2pdf.convert(temp_dir) which was the OOM hot spot on 17-subtask
+    # jobs (2026-05-21).
+    temp_dir = runtime["temp_convert_dir"]
+    temp_docx = temp_dir / Path(docx_path).name
+    shutil.copy(docx_path, str(temp_docx))
+    _convert_docx_to_pdf(str(temp_docx), str(temp_dir))
 
     today_folder = runtime["output_dir"] / today.strftime("%Y-%m-%d")
     today_folder.mkdir(parents=True, exist_ok=True)
@@ -365,5 +423,11 @@ def generate_contract_from_gui(context):
         output_row = pd.concat([existing, output_row], ignore_index=True)
 
     output_row.to_excel(runtime["generated_excel_path"], index=False)
+
+    # Drop the pandas DataFrame + any other transients before the next
+    # contract in the same batch. Without this, peak memory drifts up
+    # across iterations until Render OOM-kills the worker.
+    del output_row
+    gc.collect()
 
     return contract_id
